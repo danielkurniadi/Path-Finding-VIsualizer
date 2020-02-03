@@ -1,22 +1,19 @@
-""" Modules containing Tile and GridBoard class
+""" Modules containing cell and GridBoard class
 Author: Daniel Kurniadi, 2020
 """
 
 import numpy as np
 
 
-class Tile(object):
-	""" Tile class representing each square in grid.
+class Cell(object):
+	""" cell class representing each square in grid.
 	"""
 	def __init__(self, x, y):
 		self.x = x
 		self.y = y
 		self._distance = float('inf')
 		self._heuristic = 0
-
-		self.closed = False    # has been visited in closedSet
-		self.opened = False    # has been considered in openSet
-		self.obstacle = False  # becomes obstacle tile
+		self.obstacle = False  # becomes obstacle cell
 
 	@property
 	def distance(self):
@@ -41,7 +38,7 @@ class Tile(object):
 		if isinstance(other, (list, tuple)) and len(other) == 2:
 			x, y = other
 			return x == self.x and y == self.y
-		elif isinstance(other, Tile):
+		elif isinstance(other, Cell):
 			return (self.x, self.y) == (other.x, other.y)
 		else:
 			raise TypeError("Comparison operation not supported between "
@@ -53,23 +50,26 @@ class Tile(object):
 
 # Comment: scopenya kok ga jelas ya...
 class GridBoard(object):
-	""" GridBoard class representing a grid board which contains Tile(s)
+	""" GridBoard class representing a grid board which contains cell(s)
 	"""
 	neighbours4 = [(1, 0), (-1, 0), (0, 1), (0, -1)]
 	neighbours8 = [(1, 1), (-1, -1), (1, -1), (-1, 1)]
 
-	def __init__(self, tileRows, tileCols, neighbourMode='four'):
+	def __init__(self, numRows, numCols, neighbourMode='four'):
+		""" Initialise GridBoard and populate with Cells of numRows x numCells
+		:type numRows: int
+		:type numCols: int
+		:type neighbourMode: str; enum
 		"""
-		"""
-		self._tileRows = tileRows
-		self._tileCols = tileCols
+		self._numRows = numRows
+		self._numCols = numCols
 		self._neighbourDirections = GridBoard.neighbours4
 
-		# populate grids with tiles
-		x_axis = np.arange(0, tileCols + 1).astype(int)
-		y_axis = np.arange(0, tileRows + 1).astype(int)
+		# populate grids with cells
+		x_axis = np.arange(0, numCols + 1).astype(int)
+		y_axis = np.arange(0, numRows + 1).astype(int)
 		meshgrid = np.meshgrid(x_axis, y_axis)
-		self._tiles = { Tile(x, y): 1 for xx, yy in zip(*mesh) for x, y in zip(xx, yy)}
+		self._cells = { Cell(x, y): 1 for xx, yy in zip(*meshgrid) for x, y in zip(xx, yy)}
 
 		if neighbourMode == 'eight':
 			self._neighbourDirections.extend(GridBoard.neighbours8)
@@ -79,22 +79,48 @@ class GridBoard(object):
 		:rtype (int, int)
 		"""
 		if format == 'WH':
-			return (self._tileRows, self._tileCols)
+			return (self._numRows, self._numCols)
 		elif format == 'HW':
-			return (self._tileCols, self._tileRows)
+			return (self._numCols, self._numRows)
 		else:
 			ValueError("Gridboard size `format`: %s not recognized. Either use 'WH' or 'HW'.")
 
 	def get(self, x, y):
-		if x, y in self._tiles:
-			return self._tiles([x, y])
+		""" Get a cell given a coordinate if cell inside the grid boundary.
+		If not in boundary then return None.
+
+		:type x: int
+		:type y: int
+		:rtype Cell or None
+		"""
+		if (x, y) in self._cells:
+			return self._cells[(x, y)]
 		return None
 
-	def getNeighbours(self, tile):
-		x, y = tile.x, tile.y
-		neighbourTiles = []
+	def getNeighbours(self, cell=None, x=-1, y=-1):
+		""" Get neighbours of cell given the cell
+		:type cell: Cell; optional
+		:type x: int; optional
+		:type y: int; optional
+		:rtype List[Cell]
+		"""
+		if cell: 
+			# cell object is passed instead of x, y
+			x, y = cell.x, cell.y
+
+		cell = cell or self._cells[(x, y)]
+
+		# sanity check
+		if not cell or cell not in self._cells or cell.obstacle:
+			return []
+		elif (isinstance(x, int) and isinstance(y, int)):
+			return []
+
+		neighbours = []
 		for xDir, yDir in self._neighbourDirections:
-			if (x + xDir, y + yDir) in self._tiles:
-				tile = self._tiles[(x + xDir, y + yDir)]
-				neighbourTiles.append(tile)
-		return neighbourTiles
+			coor = (x + xDir, y + yDir)
+			if coor in self._cells:
+				cell = self._cells[coor]
+				if not cell.obstacle:
+					neighbours.append(cell)
+		return neighbours
